@@ -23,6 +23,10 @@ export default function GoalApp() {
   const [showModal, setShowModal] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [toast, setToast] = useState<{message: string, action?: () => void, timeoutId: ReturnType<typeof setTimeout>} | null>(null);
+  const [titleError, setTitleError] = useState("");
+  const [dateError, setDateError] = useState("");
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -41,16 +45,40 @@ export default function GoalApp() {
     }
   }, [goals]);
 
+  useEffect(() => {
+    if (showModal && titleInputRef.current) {
+      titleInputRef.current.focus();
+    }
+  }, [showModal]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowModal(false);
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [showModal]);
+
   function addGoal(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!title.trim() || !date) return;
+    setTitleError("");
+    setDateError("");
+    if (!title.trim()) {
+      setTitleError("Title is required");
+      return;
+    }
+    if (!date) {
+      setDateError("Due date is required");
+      return;
+    }
     const newGoal: Goal = {
       id: Date.now().toString(36),
       title: title.trim(),
       dueDate: date,
       completed: false,
     };
-    setGoals((s) => [newGoal, ...s]);
+    setGoals((s) => [newGoal, ...s].sort((a, b) => a.dueDate.localeCompare(b.dueDate)));
     setTitle("");
     setDate("");
     setShowModal(false);
@@ -61,7 +89,31 @@ export default function GoalApp() {
   }
 
   function deleteGoal(id: string) {
+    const goal = goals.find((g) => g.id === id);
+    if (!goal) return;
+
+    // Remove from goals immediately
     setGoals((s) => s.filter((g) => g.id !== id));
+
+    // Set timeout for permanent delete (10 seconds)
+    const timeoutId = setTimeout(() => {
+      setToast(null);
+    }, 10000);
+
+    setToast({
+      message: `Deleted "${goal.title}"`,
+      action: () => {
+        // Undo: restore the goal
+        setGoals((s) => {
+          const newGoals = [goal, ...s];
+          // Re-sort active and completed
+          return newGoals.sort((a, b) => a.completed === b.completed ? a.dueDate.localeCompare(b.dueDate) : a.completed ? 1 : -1);
+        });
+        clearTimeout(timeoutId);
+        setToast(null);
+      },
+      timeoutId,
+    });
   }
 
   const active = goals.filter((g) => !g.completed).sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -135,11 +187,13 @@ export default function GoalApp() {
             <form onSubmit={addGoal}>
               <label className="form-row">
                 <span>Title</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} required />
+                <input ref={titleInputRef} value={title} onChange={(e) => { setTitle(e.target.value); setTitleError(""); }} required />
+                {titleError && <div className="error">{titleError}</div>}
               </label>
               <label className="form-row">
                 <span>Due date</span>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                <input type="date" value={date} onChange={(e) => { setDate(e.target.value); setDateError(""); }} required />
+                {dateError && <div className="error">{dateError}</div>}
               </label>
               <div className="modal-actions">
                 <button type="button" className="btn ghost" onClick={() => setShowModal(false)}>
@@ -151,6 +205,13 @@ export default function GoalApp() {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="toast">
+          <span>{toast.message}</span>
+          {toast.action && <button className="btn ghost small" onClick={toast.action}>Undo</button>}
         </div>
       )}
     </div>

@@ -9,6 +9,14 @@
 
 Goalz is a lightweight goal-tracking web app. The initial implementation follows a Spec-Driven Development approach: author the spec, implement the P1 (MVP) stories, verify acceptance criteria, then iterate on P2 and P3.
 
+## Clarifications
+
+### Session 2025-12-24
+
+- Q: Delete behavior → A: Soft-delete with undo (transient toast with "Undo" for 8–12s). This avoids accidental deletion while keeping the client-only MVP simple.
+- Q: Date handling → A: Use UTC date for all calculations (normalize dates to UTC midnight to compute days-left). This avoids local timezone drift across devices.
+- Q: Completed sorting → A: Sort completed goals by due date descending (latest due date first). This surfaces recently-due completed goals at the top for quick review.
+
 ## User Scenarios & Testing (mandatory)
 
 ### User Story 1 — Create & View Goals (Priority: P1)
@@ -39,7 +47,8 @@ As a user, I want to mark goals as complete with a checkbox and delete goals per
 
 1. Given a current goal, When I check the checkbox, Then the goal moves to the Completed column and remains persisted.
 2. Given a completed goal, When I uncheck the checkbox, Then the goal moves back to Current and remains persisted.
-3. Given a goal (current or completed), When I click Delete, Then the goal is removed from the UI and from localStorage.
+3. Given a goal (current or completed), When I click Delete, Then the goal is removed from the UI and from localStorage; a transient toast with an "Undo" option is shown for 8–12s allowing restoration.
+4. Given multiple completed goals, When viewing the Completed column, Then goals are ordered by due date descending (latest due date first).
 
 ---
 
@@ -83,7 +92,7 @@ As a user, I want goals sorted by due date and prevented from being created with
 
 ## Edge Cases
 
-- Timezone handling: due dates are stored as local-date (ISO yyyy-mm-dd) and displayed relative to user's local date.
+- Timezone handling: due dates are stored as ISO yyyy-mm-dd. All days-left calculations MUST normalize dates to UTC midnight (use UTC date arithmetic) to avoid local timezone drift across devices; display may still use local formatting.
 - Past dates: treated as "Expired"; adding a past date is allowed but should show expired styling.
 - Duplicate titles: allowed; consider uniqueness if later required.
 - Very long titles: UI should ellipsize or wrap gracefully.
